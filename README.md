@@ -4,6 +4,12 @@ This repository contains the implementation of DQN + HER. The implementation is 
 problem presented in the [paper](https://arxiv.org/pdf/1707.01495.pdf). 
 Here is a [blog post](https://becominghuman.ai/learning-from-mistakes-with-hindsight-experience-replay-547fce2b3305) about HER.  
 
+The hyperparameters used in this repo are the same as the paper..  
+* $\alpha$: 0.001
+* $\gamma$: 0.98
+* Q-Network is an MLP with 256 hidden units
+* Buffer holds up to $10^6$ transitions
+
 ### How to train?
 ```python train.py --help```  
 ```
