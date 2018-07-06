@@ -15,29 +15,58 @@ class DQN(object):
 
         in_dim = 2*self.num_actions if her else self.num_actions
 
-        self.states = tf.placeholder(tf.float32, (self.minibatch_size, in_dim))
-        self.actions = tf.placeholder(tf.int32, self.minibatch_size)
-        self.target_q = tf.placeholder(tf.float32, self.minibatch_size)
+        self.states = tf.placeholder(tf.float32, (None, in_dim), name='states')
+        self.next_states = tf.placeholder(tf.float32, (None, in_dim), name='next_states')
+        self.actions = tf.placeholder(tf.int32, self.minibatch_size, name='actions')
+        self.rewards = tf.placeholder(tf.float32, self.minibatch_size, name='rewards')
         self.optimizer = tf.train.AdamOptimizer(self.lr)
+
         self.form_graph()
 
         self.sess.run(tf.global_variables_initializer())
 
+    def q_net(self, inp, reuse=None):
+        hidden = tf.layers.dense(inp, 256, tf.nn.relu, reuse=reuse, name='layer1')
+        out = tf.layers.dense(hidden, self.num_actions, reuse=reuse, name='layer2')
+        return out
+
     def form_graph(self):
-        self.hidden = tf.layers.dense(self.states, 256, activation=tf.nn.relu)
-        self.q_values = tf.layers.dense(self.hidden, self.num_actions)
-        self.greedy = tf.argmax(self.q_values, axis=-1)
+        q_values = self.q_net(self.states)
+        self.greedy = tf.argmax(q_values, axis=-1)
 
         actions_oh = tf.one_hot(self.actions, self.num_actions, dtype=tf.float32)
-        selected_q = tf.reduce_sum(tf.multiply(actions_oh, self.q_values), axis=1)
+        selected_q = tf.reduce_sum(tf.multiply(actions_oh, q_values), axis=1)
 
-        self.error = tf.reduce_sum(tf.squared_difference(self.target_q, selected_q))
+        next_q = self.q_net(self.next_states, reuse=True)
+        max_q = tf.reduce_max(next_q, axis=-1)
+        target_q = self.rewards + self.discount * max_q
+
+        self.error = tf.reduce_sum(tf.squared_difference(target_q, selected_q))
         self.update_op = self.optimizer.minimize(self.error)
 
-    def store_transition(self):
-        self.experience_buffer.append(None)
+    def store_transition(self, state, action, reward, next_state, goal=None):
+        if goal is not None:
+            state = np.concatenate([state, goal], axis=0)
+            next_state = np.concatenate([next_state, goal], axis=0)
+        self.experience_buffer.append((state, action, reward, next_state))
         if len(self.experience_buffer) > self.buffer_size: del self.experience_buffer[0]
 
+    def get_action(self, state, goal=None):
+        if goal is not None:
+            inp = np.concatenate([state, goal], axis=0).reshape(1,-1)
+        else:
+            inp = state.reshape(-1,1)
+        return self.sess.run(self.greedy, feed_dict={self.states:inp})[0]
+
     def update(self):
-        pass
-        # minibatch = random.sample(self.experience_buffer, self.minibatch_size)
+        minibatch = random.sample(self.experience_buffer, self.minibatch_size)
+        states = np.array([m[0] for m in minibatch])
+        actions = np.array([m[1] for m in minibatch])
+        rewards = np.array([m[2] for m in minibatch])
+        next_states = np.array([m[3] for m in minibatch])
+
+        self.sess.run(self.update_op, feed_dict={self.states:states,
+                                                 self.actions:actions,
+                                                 self.rewards:rewards,
+                                                 self.next_states:next_states})
+

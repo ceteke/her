@@ -22,8 +22,8 @@ for epoch in range(args.i):
         for episode in range(args.e):
             state = env.reset()
             for t in range(args.s):
-                # Take a step
-                # Store transition
-                pass
+                action = dqn.get_action(state, env.goal)
+                next_state, reward = env.step(state, action)
+                dqn.store_transition(state, action, reward, next_state, env.goal)
         for opt_step in range(args.o):
             dqn.update()
