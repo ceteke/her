@@ -4,7 +4,7 @@ import numpy as np
 
 
 class DQN(object):
-    def __init__(self, num_actions, her=True):
+    def __init__(self, num_actions):
         self.num_actions = num_actions
         self.discount = 0.98
         self.buffer_size = int(1e6)

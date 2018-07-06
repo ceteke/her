@@ -18,7 +18,10 @@ class Env():
         next_state = np.copy(state)
         next_state[action] = 1 - next_state[action]
 
-        if not np.sum(next_state == self.goal) == self.size:
+        if not self.check_success(next_state, self.goal):
             return next_state, -1, False
         else:
-            return next_state, +1, True
+            return next_state, 0, True
+
+    def check_success(self, state, goal):
+        return np.sum(state == goal) == self.size
