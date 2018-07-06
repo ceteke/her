@@ -11,6 +11,8 @@ class DQN(object):
         self.minibatch_size = 128
         self.lr = 1e-3
         self.epsilon = 0
+        self.C = 1e2
+        self.update_count = 0
         self.experience_buffer = []
         self.sess = tf.Session()
 
@@ -23,13 +25,31 @@ class DQN(object):
         self.optimizer = tf.train.AdamOptimizer(self.lr)
 
         self.form_graph()
+        self.vars = {v.name:v for v in tf.trainable_variables()}
 
         self.sess.run(tf.global_variables_initializer())
+        self.update_target() # Initialize with same values
 
-    def q_net(self, inp, reuse=None):
-        hidden = tf.layers.dense(inp, 256, tf.nn.relu, reuse=reuse, name='layer1')
-        out = tf.layers.dense(hidden, self.num_actions, reuse=reuse, name='layer2')
+    def q_net(self, inp, reuse=None, target=False):
+        name = '_target' if target else ''
+
+        hidden = tf.layers.dense(inp, 256, tf.nn.relu, reuse=reuse, name='layer1{}'.format(name))
+        out = tf.layers.dense(hidden, self.num_actions, reuse=reuse, name='layer2{}'.format(name))
+
         return out
+
+    def update_target(self):
+        q_W1 = tf.get_default_graph().get_tensor_by_name('layer1/kernel:0')
+        q_b1 = tf.get_default_graph().get_tensor_by_name('layer1/bias:0')
+
+        self.vars['layer1_target/kernel:0'].assign(q_W1).eval(session=self.sess)
+        self.vars['layer1_target/bias:0'].assign(q_b1).eval(session=self.sess)
+
+        q_W2 = tf.get_default_graph().get_tensor_by_name('layer2/kernel:0')
+        q_b2 = tf.get_default_graph().get_tensor_by_name('layer2/bias:0')
+
+        self.vars['layer2_target/kernel:0'].assign(q_W2).eval(session=self.sess)
+        self.vars['layer2_target/bias:0'].assign(q_b2).eval(session=self.sess)
 
     def form_graph(self):
         q_values = self.q_net(self.states)
@@ -38,7 +58,7 @@ class DQN(object):
         actions_oh = tf.one_hot(self.actions, self.num_actions, dtype=tf.float32)
         selected_q = tf.reduce_sum(tf.multiply(actions_oh, q_values), axis=1)
 
-        next_q = self.q_net(self.next_states, reuse=True)
+        next_q = self.q_net(self.next_states, target=True)
         max_q = tf.reduce_max(next_q, axis=-1)
         target_q = self.rewards + self.discount * max_q
         target_q = tf.clip_by_value(target_q, -1 / (1 - self.discount), 0)
@@ -74,3 +94,9 @@ class DQN(object):
                                                  self.actions:actions,
                                                  self.rewards:rewards,
                                                  self.next_states:next_states})
+
+        self.update_count += 1
+
+        if self.update_count == self.C:
+            self.update_count = 0
+            self.update_target()

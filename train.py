@@ -6,7 +6,7 @@ import random
 
 parser = argparse.ArgumentParser(description='HER Bit Flipping')
 parser.add_argument('-v', action='store_true', help='Verbose flag')
-parser.add_argument('-s', type=int, default=20, help='Size of bit string')
+parser.add_argument('-s', type=int, default=15, help='Size of bit string')
 parser.add_argument('-i', type=int, default=200, help='Num epochs')
 parser.add_argument('-e', type=int, default=16, help='Num episodes')
 parser.add_argument('-c', type=int, default=50, help='Num cycles')
