@@ -13,17 +13,23 @@ parser.add_argument('-o', type=int, default=40, help='Optimization steps')
 
 args = parser.parse_args()
 
-dqn = DQN(args.s)
+dqn = DQN(args.s, False)
 env = Env(args.s)
 
 for epoch in range(args.i):
+    success = 0
     print("Epoch {}".format(epoch+1))
     for cycle in range(args.c):
         for episode in range(args.e):
             state = env.reset()
             for t in range(args.s):
                 action = dqn.get_action(state, env.goal)
-                next_state, reward = env.step(state, action)
+                next_state, reward, done = env.step(state, action)
                 dqn.store_transition(state, action, reward, next_state, env.goal)
+                if done:
+                    success += 1
+                    break
+                state = next_state
         for opt_step in range(args.o):
             dqn.update()
+    print("Success: {0:.2f}%".format((success/(args.c*args.e))*100))

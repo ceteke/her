@@ -10,10 +10,11 @@ class DQN(object):
         self.buffer_size = int(1e6)
         self.minibatch_size = 128
         self.lr = 1e-3
+        self.epsilon = 0
         self.experience_buffer = []
         self.sess = tf.Session()
 
-        in_dim = 2*self.num_actions if her else self.num_actions
+        in_dim = 2*self.num_actions
 
         self.states = tf.placeholder(tf.float32, (None, in_dim), name='states')
         self.next_states = tf.placeholder(tf.float32, (None, in_dim), name='next_states')
@@ -40,26 +41,30 @@ class DQN(object):
         next_q = self.q_net(self.next_states, reuse=True)
         max_q = tf.reduce_max(next_q, axis=-1)
         target_q = self.rewards + self.discount * max_q
+        target_q = tf.clip_by_value(target_q, -1 / (1 - self.discount), 0)
 
         self.error = tf.reduce_sum(tf.squared_difference(target_q, selected_q))
         self.update_op = self.optimizer.minimize(self.error)
 
-    def store_transition(self, state, action, reward, next_state, goal=None):
-        if goal is not None:
-            state = np.concatenate([state, goal], axis=0)
-            next_state = np.concatenate([next_state, goal], axis=0)
+    def store_transition(self, state, action, reward, next_state, goal):
+        state = np.concatenate([state, goal], axis=0)
+        next_state = np.concatenate([next_state, goal], axis=0)
+
         self.experience_buffer.append((state, action, reward, next_state))
         if len(self.experience_buffer) > self.buffer_size: del self.experience_buffer[0]
 
     def get_action(self, state, goal=None):
-        if goal is not None:
-            inp = np.concatenate([state, goal], axis=0).reshape(1,-1)
-        else:
-            inp = state.reshape(-1,1)
+        if random.random() < self.epsilon:
+            return random.randint(0, self.num_actions-1)
+        inp = np.concatenate([state, goal], axis=0).reshape(1,-1)
         return self.sess.run(self.greedy, feed_dict={self.states:inp})[0]
 
     def update(self):
-        minibatch = random.sample(self.experience_buffer, self.minibatch_size)
+        try:
+            minibatch = random.sample(self.experience_buffer, self.minibatch_size)
+        except ValueError:
+            return
+
         states = np.array([m[0] for m in minibatch])
         actions = np.array([m[1] for m in minibatch])
         rewards = np.array([m[2] for m in minibatch])
@@ -69,4 +74,3 @@ class DQN(object):
                                                  self.actions:actions,
                                                  self.rewards:rewards,
                                                  self.next_states:next_states})
-

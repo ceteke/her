@@ -19,6 +19,6 @@ class Env():
         next_state[action] = 1 - next_state[action]
 
         if not np.sum(next_state == self.goal) == self.size:
-            return next_state, -1
+            return next_state, -1, False
         else:
-            return next_state, 0
+            return next_state, +1, True
